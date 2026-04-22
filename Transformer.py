@@ -60,8 +60,7 @@ import time
 for i in range(5):
     # Prediction
     text = input("Text: ")
-
-# tokenize text
+    
     token_text = tokenizer.texts_to_sequences([text])[0]
     padded_token_text = pad_sequences([token_text], maxlen=max_len, padding='pre')
 
