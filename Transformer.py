@@ -108,20 +108,21 @@ class WordPredictor:
             if not text.strip():
                 continue
                 
-            token_text = self.tokenizer.texts_to_sequences([text])[0]
-            # Use max_len - 1 as that is what the model expects as input length
-            padded_token_text = pad_sequences([token_text], maxlen=self.max_len - 1, padding='pre')
+            for _ in range(10):
+                token_text = self.tokenizer.texts_to_sequences([text])[0]
+                # Use max_len - 1 as that is what the model expects as input length
+                padded_token_text = pad_sequences([token_text], maxlen=self.max_len - 1, padding='pre')
 
-            # Predict
-            predictions = self.model.predict(padded_token_text, verbose=0)
-            pos = np.argmax(predictions)
+                # Predict
+                predictions = self.model.predict(padded_token_text, verbose=0)
+                pos = np.argmax(predictions)
 
-            for word, index in self.tokenizer.word_index.items():
-                if index == pos:
-                    text = text + ' ' + word
-                    print("Predicted:", text)
-                    time.sleep(1)
-                    break
+                for word, index in self.tokenizer.word_index.items():
+                    if index == pos:
+                        text = text + ' ' + word
+                        print("Predicted:", text)
+                        time.sleep(0.5)
+                        break
 
 if __name__ == "__main__":
     predictor = WordPredictor()
