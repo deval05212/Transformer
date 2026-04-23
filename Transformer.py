@@ -11,14 +11,17 @@ import numpy as np
 
 tokenizer = Tokenizer()
 
+# Opening Dataset...
 with open('data.txt', 'r', encoding='utf-8') as f:
     text = f.read()
-# print(text)
+
+# Converting Token
 tokenizer.fit_on_texts([text])
 tokens_len = len(tokenizer.word_index)
 vocab_size = tokens_len + 1
 input_sequences = []
 
+# Create sequences
 for sentances in text.split('\n'):
     tokenized_sentance = tokenizer.texts_to_sequences([sentances])[0]
 
@@ -28,6 +31,7 @@ for sentances in text.split('\n'):
 
 max_len = max([len(x) for x in input_sequences])
 
+# Pad_sequences
 pad_input_sequences = pad_sequences(input_sequences, maxlen=max_len, padding='pre')
 
 X = pad_input_sequences[:,:-1]
@@ -38,25 +42,30 @@ y = to_categorical(y, num_classes=vocab_size)
 output_dim = 100
 input_length = X.shape[1]
 
+# Convert model
 model = Sequential()
 model.add(Embedding(input_dim=vocab_size, output_dim=output_dim, input_length=input_length))
 model.add(LSTM(150))
 model.add(Dense(vocab_size, activation='softmax'))
 
+# compile model
 model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=['accuracy'])
 
 model.summary()
 
-
+# Train Model
 model.fit(X,y, epochs=100)
 
+# Save Model
 model.save("next_word_model.keras")
 
+# Save Tokens
 with open("tokenizer.pkl", "wb") as f:
     pickle.dump(tokenizer, f)
 
 import time 
 
+# Predict word...
 for i in range(5):
     # Prediction
     text = input("Text: ")
@@ -72,3 +81,4 @@ for i in range(5):
             text = text + ' ' + word
             print(text)
             time.sleep(2)
+
