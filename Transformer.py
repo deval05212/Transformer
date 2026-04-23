@@ -1,87 +1,133 @@
-# Upload Libs..
+import os
+import time
+import pickle
+import numpy as np
 
 import tensorflow as tf
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
-
-from keras.models import Sequential, save_model
+from keras.models import Sequential, load_model
 from keras.layers import Embedding, LSTM, Dense
 
-import pickle
-import numpy as np
+class WordPredictor:
+    def __init__(self, data_path='data.txt', model_path='next_word_model.keras', tokenizer_path='tokenizer.pkl'):
+        self.data_path = data_path
+        self.model_path = model_path
+        self.tokenizer_path = tokenizer_path
+        
+        self.tokenizer = Tokenizer()
+        self.model = None
+        self.max_len = 0
+        self.vocab_size = 0
 
-tokenizer = Tokenizer()
+    def prepare_data(self):
+        print("Opening Dataset...")
+        with open(self.data_path, 'r', encoding='utf-8') as f:
+            text = f.read()
 
-# Opening Dataset...
-with open('data.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
+        print("Converting Tokens...")
+        self.tokenizer.fit_on_texts([text])
+        self.vocab_size = len(self.tokenizer.word_index) + 1
+        input_sequences = []
 
-# Converting Token
-tokenizer.fit_on_texts([text])
-tokens_len = len(tokenizer.word_index)
-vocab_size = tokens_len + 1
-input_sequences = []
+        # Create sequences
+        for sentance in text.split('\n'):
+            tokenized_sentance = self.tokenizer.texts_to_sequences([sentance])[0]
+            for i in range(1, len(tokenized_sentance)):
+                n_grams = tokenized_sentance[:i+1]
+                input_sequences.append(n_grams)
 
-# Create sequences
-for sentances in text.split('\n'):
-    tokenized_sentance = tokenizer.texts_to_sequences([sentances])[0]
+        self.max_len = max([len(x) for x in input_sequences])
 
-    for i in range(1,len(tokenized_sentance)):
-        n_grams = tokenized_sentance[:i+1]
-        input_sequences.append(n_grams)
+        # Pad_sequences
+        pad_input_sequences = pad_sequences(input_sequences, maxlen=self.max_len, padding='pre')
 
-max_len = max([len(x) for x in input_sequences])
+        X = pad_input_sequences[:, :-1]
+        y = pad_input_sequences[:, -1]
+        y = to_categorical(y, num_classes=self.vocab_size)
+        
+        return X, y
 
-# Pad_sequences
-pad_input_sequences = pad_sequences(input_sequences, maxlen=max_len, padding='pre')
+    def build_and_train(self, epochs=100):
+        X, y = self.prepare_data()
+        
+        output_dim = 100
+        input_length = X.shape[1]
 
-X = pad_input_sequences[:,:-1]
-y = pad_input_sequences[:,-1]
-num_classes =len(set(y))
-y = to_categorical(y, num_classes=vocab_size)
+        print("Building Model...")
+        self.model = Sequential()
+        self.model.add(Embedding(input_dim=self.vocab_size, output_dim=output_dim, input_length=input_length))
+        self.model.add(LSTM(150))
+        self.model.add(Dense(self.vocab_size, activation='softmax'))
 
-output_dim = 100
-input_length = X.shape[1]
+        # compile model
+        self.model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=['accuracy'])
+        self.model.summary()
 
-# Convert model
-model = Sequential()
-model.add(Embedding(input_dim=vocab_size, output_dim=output_dim, input_length=input_length))
-model.add(LSTM(150))
-model.add(Dense(vocab_size, activation='softmax'))
+        # Train Model
+        print(f"Training Model for {epochs} epochs...")
+        self.model.fit(X, y, epochs=epochs)
 
-# compile model
-model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=['accuracy'])
+        # Save Model and Tokenizer
+        print("Saving Model and Tokenizer...")
+        self.model.save(self.model_path)
+        with open(self.tokenizer_path, "wb") as f:
+            pickle.dump(self.tokenizer, f)
 
-model.summary()
+    def load_saved_model(self):
+        if os.path.exists(self.model_path) and os.path.exists(self.tokenizer_path):
+            print("Loading saved model and tokenizer...")
+            self.model = load_model(self.model_path)
+            
+            with open(self.tokenizer_path, "rb") as f:
+                self.tokenizer = pickle.load(f)
+                
+            # Determine max_len from the model's input shape
+            # The model was trained with input_length = max_len - 1
+            # So, max_len is model.input_shape[1] + 1
+            input_shape = self.model.input_shape[1]
+            if input_shape is not None:
+                self.max_len = input_shape + 1
+            else:
+                self.max_len = 20 # fallback if shape is unknown
+            
+            return True
+        return False
 
-# Train Model
-model.fit(X,y, epochs=100)
+    def predict_next_words(self):
+        if self.model is None:
+            print("Model is not loaded. Cannot predict.")
+            return
 
-# Save Model
-model.save("next_word_model.keras")
+        print("\n--- Word Prediction (type 'exit' to quit) ---")
+        while True:
+            text = input("Text: ")
+            if text.strip().lower() == 'exit':
+                break
+            if not text.strip():
+                continue
+                
+            token_text = self.tokenizer.texts_to_sequences([text])[0]
+            # Use max_len - 1 as that is what the model expects as input length
+            padded_token_text = pad_sequences([token_text], maxlen=self.max_len - 1, padding='pre')
 
-# Save Tokens
-with open("tokenizer.pkl", "wb") as f:
-    pickle.dump(tokenizer, f)
+            # Predict
+            predictions = self.model.predict(padded_token_text, verbose=0)
+            pos = np.argmax(predictions)
 
-import time 
+            for word, index in self.tokenizer.word_index.items():
+                if index == pos:
+                    text = text + ' ' + word
+                    print("Predicted:", text)
+                    time.sleep(1)
+                    break
 
-# Predict word...
-for i in range(5):
-    # Prediction
-    text = input("Text: ")
+if __name__ == "__main__":
+    predictor = WordPredictor()
     
-    token_text = tokenizer.texts_to_sequences([text])[0]
-    padded_token_text = pad_sequences([token_text], maxlen=max_len, padding='pre')
-
-
-    pos = np.argmax(model.predict(padded_token_text))
-
-    for word,index in tokenizer.word_index.items():
-        if index == pos:
-            text = text + ' ' + word
-            print(text)
-            time.sleep(2)
-
-# Accuracy 86% and Loss 0.50
+    print("Starting training process...")
+    # This will always train the model and save it.
+    # Run this file whenever you update data.txt
+    predictor.build_and_train(epochs=100)
+    print("Training complete. You can now use prediction.py to test the model.")
