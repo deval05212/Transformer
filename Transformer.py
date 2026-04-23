@@ -84,3 +84,4 @@ for i in range(5):
             print(text)
             time.sleep(2)
 
+# Accuracy 86% and Loss 0.50
