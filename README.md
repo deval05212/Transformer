@@ -9,13 +9,6 @@ Built with deep learning (LSTM / Transformer-based model)
 Trained on custom text dataset
 Saves and loads trained model for reuse
 
-├── data.txt              # Training dataset
-├── tokenizer.pkl         # Saved tokenizer
-├── next_word_model.keras # Trained model
-├── Transformer.py        # Model training script
-├── predict.py            # Prediction script
-└── README.md             # Project documentation
-
 ⚙️ Installation
 Clone the repository:
 git clone https://github.com/your-username/your-repo-name.git
